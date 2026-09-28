@@ -1,0 +1,27 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // SECURITY (production audit): the backend now talks to Firestore exclusively through the
+    // Firebase ADMIN SDK (service-account authenticated), which bypasses these rules entirely.
+    // No client-side code in this app reads or writes Firestore directly - all reads/writes go
+    // through the Express API / Socket.IO, which use PostgreSQL/SQLite. That means there is no
+    // legitimate reason for any of these collections (including `nabd_cloud_backup`, which
+    // previously held a full base64 dump of the SQLite database - password hashes included - and
+    // the `users` / `reels` / `follows` / `private_messages` / `wall_posts` mirrors) to be
+    // reachable by the public web client SDK. Everything is denied by default below.
+    //
+    // Previously this file allowed `allow get: if isValidId(userId) && (isSignedIn() || true);`
+    // and `allow list: if resource.data.id is string;` on several collections. The `|| true` and
+    // the always-true `list` predicate made those collections fully public - including
+    // `private_messages`, which meant anyone with the public web API key (shipped in the client
+    // bundle) could list every private message in the app directly from Firestore, and anyone
+    // could read the full-database backup blob (with password hashes) from `nabd_cloud_backup`.
+    //
+    // If a future feature needs the browser to talk to Firestore directly, add a narrowly scoped
+    // `match` block for that specific collection with real `request.auth` checks - do not widen
+    // this catch-all, and never use `|| true` (or any condition that is always true) as a rule.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
